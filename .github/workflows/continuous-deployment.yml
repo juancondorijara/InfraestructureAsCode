@@ -1,0 +1,68 @@
+name: Continuous Deployment
+
+on:
+  push:
+    branches:
+      - master
+      - production
+  pull_request:
+    branches:
+      - master
+      - production
+    
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Test and Lint
+        run: docker-compose run --rm app sh -c "python manage.py wait_for_db && python manage.py test && flake8"
+
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: 0.12.21
+      - name: Validate Terraform
+        run: |
+          cd deploy/
+          terraform init -backend=false
+          terraform validate -no-color
+          terraform fmt -check
+
+  build:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Buid and Push
+        run: echo "Build and Push Docker image"
+
+  plan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Plan Staging
+        run: echo "Plan Staging"
+      - name: Plan Production
+        run: echo "Plan Production"
+        if: github.ref == 'refs/heads/production'
+
+  apply:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Apply Staging
+        run: echo "Apply Staging"
+      - name: Apply Production
+        run: echo "Apply Production"
+        if: github.ref == 'refs/heads/production'
+        

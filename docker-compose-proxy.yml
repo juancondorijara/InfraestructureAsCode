@@ -1,0 +1,36 @@
+version: "3.7"
+
+services:
+  app:
+    build:
+      context: .
+    volumes:
+      - ./app:/app
+      - static_data:/vol/web
+    environment:
+      - DB_HOST=db
+      - DB_NAME=app
+      - DB_USER=postgres
+      - DB_PASS=supersecretpassword
+      - ALLOWED_HOSTS=127.0.0.1,localhost
+    depends_on:
+      - db
+
+  proxy:
+    image: proxy:latest
+    depends_on: 
+      - app
+    ports: 
+      - "8000:8000"
+    volumes: 
+      - static_data:/vol/static
+
+  db:
+    image: postgres:10-alpine
+    environment:
+      - POSTGRES_DB=app
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=supersecretpassword
+
+volumes: 
+  static_data:
