@@ -1,7 +1,7 @@
 name: IAC
 
 on: push
-
+# Aplicando terraform
 jobs:
   apply:
     name: Apply terraform plan
