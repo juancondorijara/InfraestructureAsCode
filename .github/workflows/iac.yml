@@ -1,140 +1,32 @@
-name: Continuous Deployment
+name: IAC
 
-on:
-  push:
-    branches:
-      - master
-      - production
-  pull_request:
-    branches:
-      - master
-      - production
-    
+on: push
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v2
-      - name: Test and Lint
-        run: docker-compose run --rm app sh -c "python manage.py wait_for_db && python manage.py test && flake8"
-
-  validate:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v2
-      - uses: hashicorp/setup-terraform@v1
-        with:
-          terraform_version: 0.12.26
-      - name: Validate Terraform
-        run: |
-          cd deploy/
-          terraform init -backend=false
-          terraform validate
-          terraform fmt -check
-
-  build:
-    runs-on: ubuntu-latest
-    needs: [test]
-    if: github.ref == 'refs/heads/master'
-
-    steps:
-      - uses: actions/checkout@v2
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: eu-west-1
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
-      - name: Declare variables
-        id: vars
-        shell: bash
-        run: |
-          echo "::set-output name=sha_short::$(git rev-parse --short=8 ${{ github.sha }})"
-      - name: Buid and Push
-        run: |
-          docker build --compress -t ${{ secrets.ECR_REPO }}:${{ steps.vars.outputs.sha_short }} .
-          docker push ${{ secrets.ECR_REPO }}:${{ steps.vars.outputs.sha_short }}
-          docker tag ${{ secrets.ECR_REPO }}:${{ steps.vars.outputs.sha_short }} ${{ secrets.ECR_REPO }}:latest
-          docker push ${{ secrets.ECR_REPO }}:latest
-
-  plan:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v2
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: eu-west-1
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
-      - name: Declare variables
-        id: vars
-        shell: bash
-        run: |
-          echo "::set-output name=sha_short::$(git rev-parse --short=8 ${{ github.sha }})"
-      - name: Plan Staging
-        run: |
-          cd deploy/
-          export TF_VAR_ecr_image_api=${{ secrets.ECR_REPO }}:${{ steps.vars.outputs.sha_short }}
-          terraform init
-          terraform workspace select staging || terraform workspace new staging
-          terraform plan
-      - name: Plan Production
-        run: |
-          cd deploy/
-          export TF_VAR_ecr_image_api=${{ secrets.ECR_REPO }}:${{ steps.vars.outputs.sha_short }}
-          terraform init
-          terraform workspace select production || terraform workspace new production
-          terraform plan
-        if: github.ref == 'refs/heads/production'
-
   apply:
+    name: Apply terraform plan
     runs-on: ubuntu-latest
-    needs: [build, plan]
-    env: 
-      TF_VAR_db_username: ${{ secrets.TF_VAR_db_username }}
-      TF_VAR_db_password: ${{ secrets.TF_VAR_db_password }}
-      TF_VAR_django_secret_key: ${{ secrets.TF_VAR_DJANGO_SECRET_KEY }}
-
+    env:
+      GITHUB_TOKEN: ${{ secrets.TOKEN_GITHUB }}
+      TF_ACTION_WORKING_DIR: '.'
+      AWS_ACCESS_KEY_ID:  ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY:  ${{ secrets.AWS_SECRET_ACCESS_KEY }}
     steps:
-      - uses: actions/checkout@v2
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: eu-west-1
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
-      - name: Declare variables
-        id: vars
-        shell: bash
-        run: |
-          echo "::set-output name=sha_short::$(git rev-parse --short=8 ${{ github.sha }})"
-      - name: Apply Staging
-        run: |
-          cd deploy/
-          export TF_VAR_ecr_image_api=${{ secrets.ECR_REPO }}:${{ steps.vars.outputs.sha_short }}
-          terraform init
-          terraform workspace select staging
-          terraform apply -auto-approve
-      - name: Apply Production
-        run: |
-          cd deploy/
-          export TF_VAR_ecr_image_api=${{ secrets.ECR_REPO }}:${{ steps.vars.outputs.sha_short }}
-          terraform init
-          terraform workspace select production
-          terraform apply -auto-approve
-        if: github.ref == 'refs/heads/production'
-        
+
+    - name: Checkout Repo
+      uses: actions/checkout@v2
+
+    - name: Terraform Setup
+      uses: hashicorp/setup-terraform@v1
+      
+    - name: Entrar
+      run: cd IAC/
+
+    - name: Terraform Init
+      run: terraform init
+      
+    - name: Terraform Plan
+      run: terraform plan
+
+    - name: Terraform Apply
+      run: terraform apply --auto-approve
