@@ -2,6 +2,7 @@ name: IAC
 
 on: push
 # Aplicando terraform
+# Actions
 jobs:
   apply:
     name: Apply terraform plan
