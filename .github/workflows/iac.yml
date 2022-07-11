@@ -19,14 +19,9 @@ jobs:
     - name: Terraform Setup
       uses: hashicorp/setup-terraform@v1
       
-    - name: Entrar
-      run: cd IAC/
-
-    - name: Terraform Init
-      run: terraform init
-      
-    - name: Terraform Plan
-      run: terraform plan
-
-    - name: Terraform Apply
-      run: terraform apply --auto-approve
+    - name: Terraform Execute
+      run: |
+        cd IAC/
+        terraform init
+        terraform plan
+        terraform apply --auto-approve
