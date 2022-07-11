@@ -22,6 +22,7 @@ jobs:
     - name: Terraform Execute
       run: |
         cd IAC/
+        terraform destroy
         terraform init
         terraform plan
         terraform apply --auto-approve
